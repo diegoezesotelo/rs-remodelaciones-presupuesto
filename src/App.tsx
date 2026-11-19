@@ -80,6 +80,18 @@ export default function App() {
   const photoUrlsRef = useRef<string[]>([]);
 
   const isOwnerMode = isOwnerEmail(authUser?.email, authUser?.emailVerified);
+  const [hasOwnerQueryFlag] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    const hash = window.location.hash.toLowerCase();
+    return (
+      params.has('dueno') ||
+      params.has('admin') ||
+      hash === '#dueno' ||
+      hash === '#admin'
+    );
+  });
+  const showOwnerTrigger = isOwnerMode || hasOwnerQueryFlag;
 
   useEffect(() => {
     const unsubscribeAuth = subscribeAuthUser((user) => {
@@ -461,23 +473,25 @@ export default function App() {
             <Instagram className="h-3.5 w-3.5" />
             <span>Instagram @{INSTAGRAM_HANDLE}</span>
           </a>
-          <button
-            type="button"
-            onClick={() => setIsOwnerModalOpen(true)}
-            className="inline-flex min-h-[36px] items-center gap-1.5 font-medium text-[#8EA3B5] transition-colors hover:text-[#B9D5E6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8DB8D2]"
-          >
-            {isOwnerMode ? (
-              <>
-                <ShieldCheck className="h-3.5 w-3.5 text-[#8DB8D2]" />
-                <span className="text-[#9AC2DA]">Modo dueño activo</span>
-              </>
-            ) : (
-              <>
-                <Lock className="h-3.5 w-3.5" />
-                <span>Acceso dueño</span>
-              </>
-            )}
-          </button>
+          {showOwnerTrigger && (
+            <button
+              type="button"
+              onClick={() => setIsOwnerModalOpen(true)}
+              className="inline-flex min-h-[36px] items-center gap-1.5 font-medium text-[#8EA3B5] transition-colors hover:text-[#B9D5E6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8DB8D2]"
+            >
+              {isOwnerMode ? (
+                <>
+                  <ShieldCheck className="h-3.5 w-3.5 text-[#8DB8D2]" />
+                  <span className="text-[#9AC2DA]">Modo dueño activo</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="h-3.5 w-3.5" />
+                  <span>Acceso dueño</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </footer>
 
