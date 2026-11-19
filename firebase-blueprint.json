@@ -1,0 +1,85 @@
+{
+  "entities": {
+    "PricingConfig": {
+      "title": "PricingConfig",
+      "description": "Configuración global de precios unitarios por tarea de RS Remodelaciones, editable únicamente por el dueño y legible por clientes.",
+      "type": "object",
+      "properties": {
+        "pintura_interior": {
+          "type": "number",
+          "description": "Precio por m² de pintura interior en ARS"
+        },
+        "pintura_exterior": {
+          "type": "number",
+          "description": "Precio por m² de pintura exterior en ARS"
+        },
+        "durlock_tabique": {
+          "type": "number",
+          "description": "Precio por m² de tabique Durlock en ARS"
+        },
+        "porcelanato": {
+          "type": "number",
+          "description": "Precio por m² de colocación de porcelanato en ARS"
+        },
+        "albanileria": {
+          "type": "number",
+          "description": "Precio por m² de albañilería general en ARS"
+        },
+        "electricidad": {
+          "type": "number",
+          "description": "Precio por boca de electricidad en ARS"
+        },
+        "plomeria": {
+          "type": "number",
+          "description": "Precio por punto de plomería en ARS"
+        },
+        "bano_completo": {
+          "type": "number",
+          "description": "Precio base de reforma de baño completo en ARS"
+        },
+        "cocina_completa": {
+          "type": "number",
+          "description": "Precio base de reforma de cocina completa en ARS"
+        },
+        "limpieza_final": {
+          "type": "number",
+          "description": "Precio fijo de limpieza final de obra en ARS"
+        },
+        "retiro_escombros": {
+          "type": "number",
+          "description": "Precio por retiro de escombros en ARS"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Fecha y hora de última actualización de precios"
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "UID del dueño que guardó la actualización de precios"
+        }
+      },
+      "required": [
+        "pintura_interior",
+        "pintura_exterior",
+        "durlock_tabique",
+        "porcelanato",
+        "albanileria",
+        "electricidad",
+        "plomeria",
+        "bano_completo",
+        "cocina_completa",
+        "limpieza_final",
+        "retiro_escombros",
+        "updatedAt",
+        "updatedBy"
+      ]
+    }
+  },
+  "firestore": {
+    "/settings/pricing": {
+      "schema": { "$ref": "#/entities/PricingConfig" },
+      "description": "Documento único con los precios vigentes de cada tarea de remodelación."
+    }
+  }
+}

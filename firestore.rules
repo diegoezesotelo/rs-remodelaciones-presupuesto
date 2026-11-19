@@ -1,0 +1,122 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable Hardened Helpers
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner() {
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email is string
+        && request.auth.token.email.lower() in [
+          'rs.remodela@gmail.com',
+          'diegoeze.sotelo@gmail.com'
+        ];
+    }
+
+    function isValidPrice(val) {
+      return (val is int || val is float) && val >= 0 && val <= 100000000;
+    }
+
+    function isValidPricingConfig(data) {
+      return data.keys().hasAll([
+        'pintura_interior',
+        'pintura_exterior',
+        'durlock_tabique',
+        'porcelanato',
+        'albanileria',
+        'electricidad',
+        'plomeria',
+        'bano_completo',
+        'cocina_completa',
+        'limpieza_final',
+        'retiro_escombros',
+        'updatedAt',
+        'updatedBy'
+      ]) && data.keys().hasOnly([
+        'pintura_interior',
+        'pintura_exterior',
+        'durlock_tabique',
+        'porcelanato',
+        'albanileria',
+        'electricidad',
+        'plomeria',
+        'bano_completo',
+        'cocina_completa',
+        'limpieza_final',
+        'retiro_escombros',
+        'updatedAt',
+        'updatedBy'
+      ]) && isValidPrice(data.pintura_interior)
+         && isValidPrice(data.pintura_exterior)
+         && isValidPrice(data.durlock_tabique)
+         && isValidPrice(data.porcelanato)
+         && isValidPrice(data.albanileria)
+         && isValidPrice(data.electricidad)
+         && isValidPrice(data.plomeria)
+         && isValidPrice(data.bano_completo)
+         && isValidPrice(data.cocina_completa)
+         && isValidPrice(data.limpieza_final)
+         && isValidPrice(data.retiro_escombros)
+         && data.updatedAt is timestamp
+         && data.updatedAt == request.time
+         && data.updatedBy is string
+         && data.updatedBy.size() > 0
+         && data.updatedBy.size() <= 128
+         && data.updatedBy == request.auth.uid;
+    }
+
+    match /settings/{settingId} {
+      // Public get on pricing document only (no PII stored, list disabled)
+      allow get: if isValidId(settingId) && settingId == 'pricing';
+      allow list: if false;
+
+      allow create: if isOwner()
+        && isValidId(settingId)
+        && settingId == 'pricing'
+        && isValidPricingConfig(incoming());
+
+      allow update: if isOwner()
+        && isValidId(settingId)
+        && settingId == 'pricing'
+        && isValidPricingConfig(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'pintura_interior',
+          'pintura_exterior',
+          'durlock_tabique',
+          'porcelanato',
+          'albanileria',
+          'electricidad',
+          'plomeria',
+          'bano_completo',
+          'cocina_completa',
+          'limpieza_final',
+          'retiro_escombros',
+          'updatedAt',
+          'updatedBy'
+        ]);
+
+      allow delete: if false;
+    }
+  }
+}

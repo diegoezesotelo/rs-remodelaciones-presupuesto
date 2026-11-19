@@ -1,0 +1,6 @@
+{
+  "name": "RS Remodelaciones - Presupuesto Online",
+  "description": "Calculadora formal de presupuestos online para obras y remodelaciones de RS Remodelaciones en Valentín Alsina, Buenos Aires.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
