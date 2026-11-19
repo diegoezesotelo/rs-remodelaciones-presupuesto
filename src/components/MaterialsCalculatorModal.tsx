@@ -7,6 +7,8 @@ import {
   Hammer,
   Layers,
   Paintbrush,
+  Plus,
+  Trash2,
   X,
 } from 'lucide-react';
 import { useEffect, useState, type ComponentType } from 'react';
@@ -33,7 +35,6 @@ const MATERIAL_TABS: {
   { id: 'albanileria', label: 'Albañilería', icon: Hammer },
 ];
 
-// Referencia de precios actualizados mercado Argentina (ARS, Sodimac/Easy/Corralones BA)
 const REF_PRICES = {
   latexInterior20L: 135_000,
   latexInterior10L: 76_000,
@@ -65,6 +66,57 @@ interface MaterialLineItem {
   subtotal: number;
 }
 
+interface SavedMaterialGroup {
+  key: string;
+  tab: MaterialTab;
+  title: string;
+  items: MaterialLineItem[];
+  subtotal: number;
+}
+
+function buildGroupLines(group: SavedMaterialGroup): string[] {
+  return [
+    `${group.title}:`,
+    ...group.items.map(
+      (item) =>
+        `• ${item.name}: ${item.quantityText} (~${formatARS(item.subtotal)})`
+    ),
+    `• Subtotal ${group.title}: ${formatARS(group.subtotal)}`,
+  ];
+}
+
+function buildCombinedMaterialsLines(groups: SavedMaterialGroup[]): string[] {
+  if (groups.length === 0) return [];
+  if (groups.length === 1) {
+    const only = groups[0];
+    return [
+      `Materiales aprox. — ${only.title}:`,
+      ...only.items.map(
+        (item) =>
+          `• ${item.name}: ${item.quantityText} (~${formatARS(item.subtotal)})`
+      ),
+      `• Total aprox. en materiales: ${formatARS(only.subtotal)}`,
+    ];
+  }
+
+  const grandTotal = groups.reduce((acc, g) => acc + g.subtotal, 0);
+  const lines: string[] = ['Materiales aprox. (varios trabajos):'];
+
+  groups.forEach((group, idx) => {
+    if (idx > 0) lines.push('');
+    lines.push(...buildGroupLines(group));
+  });
+
+  lines.push('');
+  lines.push(
+    `• Total general aprox. en materiales (${groups.length} trabajos): ${formatARS(
+      grandTotal
+    )}`
+  );
+
+  return lines;
+}
+
 export function MaterialsCalculatorModal({
   isOpen,
   onClose,
@@ -74,25 +126,26 @@ export function MaterialsCalculatorModal({
 }: MaterialsCalculatorModalProps) {
   const [activeTab, setActiveTab] = useState<MaterialTab>('pintura');
   const [copied, setCopied] = useState(false);
+  const [savedGroups, setSavedGroups] = useState<SavedMaterialGroup[]>([]);
 
-  // Pintura state
   const [paintArea, setPaintArea] = useState<number>(25);
   const [paintCoats, setPaintCoats] = useState<2 | 3>(2);
-  const [paintType, setPaintType] = useState<'interior' | 'exterior'>('interior');
+  const [paintType, setPaintType] = useState<'interior' | 'exterior'>(
+    'interior'
+  );
   const [includePrimer, setIncludePrimer] = useState<boolean>(true);
 
-  // Porcelanato state
   const [tileArea, setTileArea] = useState<number>(15);
   const [tileWastePct, setTileWastePct] = useState<10 | 15>(10);
   const [tileBoxM2, setTileBoxM2] = useState<number>(1.44);
 
-  // Durlock state
   const [durlockArea, setDurlockArea] = useState<number>(12);
   const [durlockFaces, setDurlockFaces] = useState<1 | 2>(2);
 
-  // Albañilería state
   const [masonryArea, setMasonryArea] = useState<number>(12);
-  const [masonryType, setMasonryType] = useState<'revoque' | 'carpeta'>('revoque');
+  const [masonryType, setMasonryType] = useState<'revoque' | 'carpeta'>(
+    'revoque'
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -105,7 +158,6 @@ export function MaterialsCalculatorModal({
 
   if (!isOpen) return null;
 
-  // 1. Pintura calculations
   const paintLiters = Math.max(1, Math.ceil((paintArea * paintCoats) / 10));
   const cans20 = Math.floor(paintLiters / 20);
   const remAfter20 = paintLiters % 20;
@@ -136,11 +188,15 @@ export function MaterialsCalculatorModal({
       .join(' + ') || '1×4L';
 
   const primerLiters = includePrimer ? Math.max(1, Math.ceil(paintArea / 12)) : 0;
-  const primerBids4L = includePrimer ? Math.max(1, Math.ceil(primerLiters / 4)) : 0;
+  const primerBids4L = includePrimer
+    ? Math.max(1, Math.ceil(primerLiters / 4))
+    : 0;
   const primerCost = primerBids4L * REF_PRICES.fijador4L;
 
   const enduidoKg = includePrimer ? Math.max(1, Math.ceil(paintArea * 0.8)) : 0;
-  const enduidoBuckets10 = includePrimer ? Math.max(1, Math.ceil(enduidoKg / 10)) : 0;
+  const enduidoBuckets10 = includePrimer
+    ? Math.max(1, Math.ceil(enduidoKg / 10))
+    : 0;
   const enduidoCost = enduidoBuckets10 * REF_PRICES.enduido10kg;
 
   const paintItems: MaterialLineItem[] = [
@@ -154,13 +210,17 @@ export function MaterialsCalculatorModal({
       ? [
           {
             name: `Fijador al agua (${primerLiters} L est.)`,
-            quantityText: `${primerBids4L} bidón${primerBids4L > 1 ? 'es' : ''} × 4L`,
+            quantityText: `${primerBids4L} bidón${
+              primerBids4L > 1 ? 'es' : ''
+            } × 4L`,
             unitPriceText: `${formatARS(REF_PRICES.fijador4L)} c/u`,
             subtotal: primerCost,
           },
           {
             name: `Enduido plástico (${enduidoKg} kg est.)`,
-            quantityText: `${enduidoBuckets10} balde${enduidoBuckets10 > 1 ? 's' : ''} × 10kg`,
+            quantityText: `${enduidoBuckets10} balde${
+              enduidoBuckets10 > 1 ? 's' : ''
+            } × 10kg`,
             unitPriceText: `${formatARS(REF_PRICES.enduido10kg)} c/u`,
             subtotal: enduidoCost,
           },
@@ -168,7 +228,6 @@ export function MaterialsCalculatorModal({
       : []),
   ];
 
-  // 2. Porcelanato calculations
   const tileTotalM2 = Math.round(tileArea * (1 + tileWastePct / 100) * 10) / 10;
   const safeBoxM2 = tileBoxM2 > 0 ? tileBoxM2 : 1.44;
   const tileBoxes = Math.max(1, Math.ceil(tileTotalM2 / safeBoxM2));
@@ -211,7 +270,6 @@ export function MaterialsCalculatorModal({
     },
   ];
 
-  // 3. Durlock calculations
   const durlockPlates = Math.max(
     1,
     Math.ceil((durlockArea * durlockFaces * 1.05) / 2.88)
@@ -224,15 +282,24 @@ export function MaterialsCalculatorModal({
   const durlockMontantes = Math.max(3, Math.ceil((durlockArea * 2.1) / 2.6));
   const montanteCost = durlockMontantes * REF_PRICES.montante69;
 
-  const durlockMasillaKg = Math.max(2, Math.ceil(durlockArea * durlockFaces * 0.65));
+  const durlockMasillaKg = Math.max(
+    2,
+    Math.ceil(durlockArea * durlockFaces * 0.65)
+  );
   const masillaBuckets18 = Math.max(1, Math.ceil(durlockMasillaKg / 18));
   const masillaCost = masillaBuckets18 * REF_PRICES.masilla18kg;
 
-  const durlockTapeMeters = Math.max(5, Math.ceil(durlockArea * durlockFaces * 1.4));
+  const durlockTapeMeters = Math.max(
+    5,
+    Math.ceil(durlockArea * durlockFaces * 1.4)
+  );
   const tapeRolls75 = Math.max(1, Math.ceil(durlockTapeMeters / 75));
   const tapeCost = tapeRolls75 * REF_PRICES.cinta75m;
 
-  const durlockScrewsT2 = Math.max(50, Math.ceil(durlockArea * durlockFaces * 16));
+  const durlockScrewsT2 = Math.max(
+    50,
+    Math.ceil(durlockArea * durlockFaces * 16)
+  );
   const screwBoxes = Math.max(1, Math.ceil(durlockScrewsT2 / 1000));
   const screwCost = screwBoxes * REF_PRICES.tornillos1000u;
 
@@ -257,7 +324,9 @@ export function MaterialsCalculatorModal({
     },
     {
       name: `Masilla (${durlockMasillaKg} kg est.)`,
-      quantityText: `${masillaBuckets18} balde${masillaBuckets18 > 1 ? 's' : ''} × 18kg`,
+      quantityText: `${masillaBuckets18} balde${
+        masillaBuckets18 > 1 ? 's' : ''
+      } × 18kg`,
       unitPriceText: `${formatARS(REF_PRICES.masilla18kg)} c/u`,
       subtotal: masillaCost,
     },
@@ -269,7 +338,6 @@ export function MaterialsCalculatorModal({
     },
   ];
 
-  // 4. Albañilería calculations
   const cementBags50 =
     masonryType === 'revoque'
       ? Math.max(1, Math.ceil(masonryArea * 0.16))
@@ -299,7 +367,9 @@ export function MaterialsCalculatorModal({
       ? [
           {
             name: 'Plasticor / albañilería (40 kg)',
-            quantityText: `${plasticorBags} bolsa${plasticorBags > 1 ? 's' : ''}`,
+            quantityText: `${plasticorBags} bolsa${
+              plasticorBags > 1 ? 's' : ''
+            }`,
             unitPriceText: `${formatARS(REF_PRICES.plasticor40kg)} c/u`,
             subtotal: plasticorCost,
           },
@@ -322,29 +392,81 @@ export function MaterialsCalculatorModal({
           ? durlockItems
           : masonryItems;
 
-  const totalMaterialsCost = activeItems.reduce((sum, i) => sum + i.subtotal, 0);
+  const activeSubtotal = activeItems.reduce((sum, i) => sum + i.subtotal, 0);
 
-  const getActiveMaterialsLines = (): string[] => {
-    const header =
-      activeTab === 'pintura'
-        ? `Materiales aprox. — Pintura ${paintType} (${paintArea} m², ${paintCoats} manos):`
-        : activeTab === 'porcelanato'
-          ? `Materiales aprox. — Porcelanato (${tileArea} m²):`
-          : activeTab === 'durlock'
-            ? `Materiales aprox. — Durlock (${durlockArea} m², ${durlockFaces} ${
-                durlockFaces === 1 ? 'cara' : 'caras'
-              }):`
-            : `Materiales aprox. — Albañilería ${
-                masonryType === 'revoque' ? 'Revoque' : 'Carpeta'
-              } (${masonryArea} m²):`;
+  const buildCurrentActiveGroup = (): SavedMaterialGroup => {
+    if (activeTab === 'pintura') {
+      return {
+        key: `pintura-${paintType}`,
+        tab: 'pintura',
+        title: `Pintura ${paintType} (${paintArea} m², ${paintCoats} manos)`,
+        items: paintItems,
+        subtotal: activeSubtotal,
+      };
+    }
+    if (activeTab === 'porcelanato') {
+      return {
+        key: 'porcelanato',
+        tab: 'porcelanato',
+        title: `Porcelanato (${tileArea} m²)`,
+        items: tileItems,
+        subtotal: activeSubtotal,
+      };
+    }
+    if (activeTab === 'durlock') {
+      return {
+        key: 'durlock',
+        tab: 'durlock',
+        title: `Durlock (${durlockArea} m², ${durlockFaces} ${
+          durlockFaces === 1 ? 'cara' : 'caras'
+        })`,
+        items: durlockItems,
+        subtotal: activeSubtotal,
+      };
+    }
+    return {
+      key: `albanileria-${masonryType}`,
+      tab: 'albanileria',
+      title: `Albañilería ${
+        masonryType === 'revoque' ? 'Revoque' : 'Carpeta'
+      } (${masonryArea} m²)`,
+      items: masonryItems,
+      subtotal: activeSubtotal,
+    };
+  };
 
-    return [
-      header,
-      ...activeItems.map(
-        (item) => `• ${item.name}: ${item.quantityText} (~${formatARS(item.subtotal)})`
-      ),
-      `• Total aprox. en materiales: ${formatARS(totalMaterialsCost)}`,
-    ];
+  const currentGroup = buildCurrentActiveGroup();
+  const isCurrentGroupSaved = savedGroups.some(
+    (g) => g.key === currentGroup.key
+  );
+  const currentTabHasSavedEntry = savedGroups.some((g) => g.tab === activeTab);
+
+  const syncAttachedIfNeeded = (nextGroups: SavedMaterialGroup[]) => {
+    if (attachedLines !== null) {
+      onAttachToBudget(
+        nextGroups.length > 0 ? buildCombinedMaterialsLines(nextGroups) : null
+      );
+    }
+  };
+
+  const handleSaveCurrentGroup = () => {
+    setSavedGroups((prev) => {
+      const existingIndex = prev.findIndex((g) => g.key === currentGroup.key);
+      const next =
+        existingIndex >= 0
+          ? prev.map((g, idx) => (idx === existingIndex ? currentGroup : g))
+          : [...prev, currentGroup];
+      syncAttachedIfNeeded(next);
+      return next;
+    });
+  };
+
+  const handleRemoveGroup = (key: string) => {
+    setSavedGroups((prev) => {
+      const next = prev.filter((g) => g.key !== key);
+      syncAttachedIfNeeded(next);
+      return next;
+    });
   };
 
   const handleImportFromTasks = () => {
@@ -367,7 +489,13 @@ export function MaterialsCalculatorModal({
     }
   };
 
-  const currentLines = getActiveMaterialsLines();
+  const effectiveGroups =
+    savedGroups.length > 0 ? savedGroups : [currentGroup];
+  const combinedTotalCost = effectiveGroups.reduce(
+    (sum, g) => sum + g.subtotal,
+    0
+  );
+  const currentLines = buildCombinedMaterialsLines(effectiveGroups);
   const isAttached =
     attachedLines !== null &&
     attachedLines.join('\n') === currentLines.join('\n');
@@ -389,6 +517,9 @@ export function MaterialsCalculatorModal({
     (activeTab === 'durlock' && tasks.durlock_tabique.enabled) ||
     (activeTab === 'albanileria' && tasks.albanileria.enabled);
 
+  const activeTabLabel =
+    MATERIAL_TABS.find((t) => t.id === activeTab)?.label ?? 'rubro';
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-sm sm:items-center sm:p-4"
@@ -400,7 +531,6 @@ export function MaterialsCalculatorModal({
       }}
     >
       <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl border border-[#8DB8D2]/40 bg-[#131E29] text-[#F4F7FA] shadow-2xl sm:rounded-2xl">
-        {/* Modal Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-white/10 bg-[#131E29]/95 px-5 py-4 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#8DB8D2]/40 bg-[#8DB8D2]/12 text-[#9AC2DA]">
@@ -414,7 +544,7 @@ export function MaterialsCalculatorModal({
                 Calculadora de materiales
               </h2>
               <p className="text-xs text-[#8EA3B5]">
-                Cantidades y precios de referencia Argentina (ARS)
+                Sumá varios trabajos para ver el total acumulado (ARS)
               </p>
             </div>
           </div>
@@ -430,7 +560,6 @@ export function MaterialsCalculatorModal({
         </div>
 
         <div className="space-y-5 p-5 sm:p-6">
-          {/* Rubro Selector Tabs */}
           <div
             className="grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-[#0C141C] p-1.5 sm:grid-cols-4"
             role="tablist"
@@ -439,6 +568,8 @@ export function MaterialsCalculatorModal({
             {MATERIAL_TABS.map((tab) => {
               const Icon = tab.icon;
               const isSelected = activeTab === tab.id;
+              const hasSaved = savedGroups.some((g) => g.tab === tab.id);
+
               return (
                 <button
                   key={tab.id}
@@ -446,20 +577,28 @@ export function MaterialsCalculatorModal({
                   role="tab"
                   aria-selected={isSelected}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8DB8D2] ${
+                  className={`flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8DB8D2] ${
                     isSelected
                       ? 'bg-[#8DB8D2] text-[#0C141C]'
-                      : 'text-[#8EA3B5] hover:text-[#F4F7FA]'
+                      : hasSaved
+                        ? 'bg-[#1A2836] text-[#B9D5E6] hover:text-[#F4F7FA]'
+                        : 'text-[#8EA3B5] hover:text-[#F4F7FA]'
                   }`}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span>{tab.label}</span>
+                  {hasSaved && (
+                    <Check
+                      className={`h-3.5 w-3.5 shrink-0 ${
+                        isSelected ? 'text-[#0C141C]' : 'text-[#8DB8D2]'
+                      }`}
+                    />
+                  )}
                 </button>
               );
             })}
           </div>
 
-          {/* Optional import button from task-by-task m2 */}
           {canImportCurrentTab && (
             <div className="flex items-center justify-between gap-3 rounded-xl border border-[#8DB8D2]/30 bg-[#8DB8D2]/10 px-4 py-2.5">
               <span className="text-xs text-[#CBD7E2]">
@@ -476,7 +615,6 @@ export function MaterialsCalculatorModal({
             </div>
           )}
 
-          {/* Tab Inputs */}
           {activeTab === 'pintura' && (
             <div className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -624,7 +762,9 @@ export function MaterialsCalculatorModal({
                   max={10}
                   value={tileBoxM2 || ''}
                   onChange={(e) =>
-                    setTileBoxM2(Math.max(0.5, parseFloat(e.target.value) || 1.44))
+                    setTileBoxM2(
+                      Math.max(0.5, parseFloat(e.target.value) || 1.44)
+                    )
                   }
                   className="mt-1.5 h-11 w-full rounded-xl border border-white/15 bg-[#0C141C] px-3.5 text-base font-semibold tabular-nums text-[#F4F7FA] focus:border-[#8DB8D2] focus:outline-none"
                 />
@@ -736,22 +876,43 @@ export function MaterialsCalculatorModal({
             </div>
           )}
 
-          {/* Total Cost Banner for Materials */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#8DB8D2]/45 bg-[#8DB8D2]/12 px-4 py-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0C141C] px-4 py-3">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#B9D5E6]">
-                Costo aproximado en materiales
+              <div className="text-xs font-semibold text-[#F4F7FA]">
+                {currentGroup.title}
               </div>
-              <div className="mt-0.5 text-xs text-[#CBD7E2]">
-                Valores orientativos Argentina (sin flete)
+              <div className="mt-0.5 text-[11px] text-[#8EA3B5]">
+                Subtotal de este trabajo
               </div>
             </div>
-            <div className="text-2xl font-bold tabular-nums text-[#F4F7FA]">
-              {formatARS(totalMaterialsCost)}
+            <div className="flex items-center gap-3">
+              <div className="text-lg font-bold tabular-nums text-[#9AC2DA]">
+                {formatARS(activeSubtotal)}
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveCurrentGroup}
+                className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-[#8DB8D2]/50 bg-[#1A2836] px-3.5 py-2 text-xs font-bold text-[#B9D5E6] transition-colors hover:border-[#8DB8D2] hover:bg-[#8DB8D2] hover:text-[#0C141C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8DB8D2]"
+              >
+                {isCurrentGroupSaved ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    <span>Actualizar en lista</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    <span>
+                      {currentTabHasSavedEntry
+                        ? `Agregar otro (${activeTabLabel})`
+                        : `Agregar ${activeTabLabel} a la lista`}
+                    </span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
-          {/* Itemized Materials List with Unit Prices & Subtotals */}
           <dl className="divide-y divide-white/10 rounded-xl border border-white/10 bg-[#0C141C] px-4 text-sm">
             {activeItems.map((item, index) => (
               <div
@@ -771,13 +932,79 @@ export function MaterialsCalculatorModal({
             ))}
           </dl>
 
+          {savedGroups.length > 0 && (
+            <div className="space-y-2.5 rounded-xl border border-[#8DB8D2]/35 bg-[#0C141C] p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8DB8D2]">
+                  Trabajos sumados ({savedGroups.length})
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSavedGroups([]);
+                    if (attachedLines !== null) onAttachToBudget(null);
+                  }}
+                  className="text-xs font-medium text-[#8EA3B5] transition-colors hover:text-[#F4F7FA]"
+                >
+                  Vaciar lista
+                </button>
+              </div>
+
+              <div className="divide-y divide-white/10">
+                {savedGroups.map((group) => (
+                  <div
+                    key={group.key}
+                    className="flex items-center justify-between gap-3 py-2.5 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold text-[#F4F7FA]">
+                        {group.title}
+                      </div>
+                      <div className="text-[11px] text-[#8EA3B5]">
+                        {group.items.length} materiales incluidos
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <span className="font-bold tabular-nums text-[#9AC2DA]">
+                        {formatARS(group.subtotal)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveGroup(group.key)}
+                        aria-label={`Quitar ${group.title}`}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-[#131E29] text-[#8EA3B5] transition-colors hover:border-red-400/50 hover:text-red-300"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#8DB8D2]/45 bg-[#8DB8D2]/12 px-4 py-3.5">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#B9D5E6]">
+                {savedGroups.length > 1
+                  ? `Total acumulado (${savedGroups.length} trabajos)`
+                  : 'Costo aproximado en materiales'}
+              </div>
+              <div className="mt-0.5 text-xs text-[#CBD7E2]">
+                Valores orientativos Argentina (sin flete)
+              </div>
+            </div>
+            <div className="text-2xl font-bold tabular-nums text-[#F4F7FA]">
+              {formatARS(combinedTotalCost)}
+            </div>
+          </div>
+
           <p className="text-[11px] leading-relaxed text-[#8EA3B5]">
             Precios orientativos relevados de mercado en Argentina (pinturerías,
             cadenas de construcción y corralones de Buenos Aires). Pueden variar
             según marca, zona y costo de flete.
           </p>
 
-          {/* Modal Action Footer */}
           <div className="flex flex-col gap-2.5 border-t border-white/10 pt-4 sm:flex-row">
             <button
               type="button"
@@ -793,7 +1020,9 @@ export function MaterialsCalculatorModal({
               <Check className="h-4 w-4" />
               {isAttached
                 ? 'Lista adjunta al WhatsApp (quitar)'
-                : 'Adjuntar lista y precios al WhatsApp'}
+                : savedGroups.length > 1
+                  ? `Adjuntar ${savedGroups.length} trabajos al WhatsApp`
+                  : 'Adjuntar lista y precios al WhatsApp'}
             </button>
 
             <button

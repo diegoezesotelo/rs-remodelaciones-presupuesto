@@ -189,9 +189,13 @@ export function BudgetSummary({
             </button>
           </div>
           <ul className="mt-2 space-y-1 text-xs leading-relaxed text-[#CBD7E2]">
-            {attachedMaterialsLines.map((line, idx) => (
-              <li key={idx}>{line}</li>
-            ))}
+            {attachedMaterialsLines.map((line, idx) =>
+              line === '' ? (
+                <li key={idx} className="h-1.5" aria-hidden="true" />
+              ) : (
+                <li key={idx}>{line}</li>
+              )
+            )}
           </ul>
         </div>
       )}
